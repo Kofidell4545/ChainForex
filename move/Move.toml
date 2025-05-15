@@ -1,0 +1,12 @@
+[package]
+name = "chainforex"
+version = "0.1.0"
+published-at = "0x0"
+
+[dependencies]
+Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/sui-framework", rev = "framework/mainnet" }
+Pyth = { git = "https://github.com/pyth-network/pyth-crosschain.git", subdir = "target_chains/sui/contracts", rev = "main" }
+
+[addresses]
+chainforex = "0x0"
+pyth = "0x0"

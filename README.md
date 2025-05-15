@@ -7,6 +7,74 @@ An open-source forex trading bot built on the Sui blockchain, powered by Pyth Ne
 [![Pyth](https://img.shields.io/badge/Pyth-Oracle-orange)](https://pyth.network/)
 [![React](https://img.shields.io/badge/React-18-blue)](https://reactjs.org/)
 
+### 💡 Summary Statement:
+
+**ChainForex** is a pioneering open-source protocol that automates forex trading on the blockchain. By combining real-time data from **Pyth** with the speed and security of **Sui**, ChainForex empowers developers and traders to experiment with, contribute to, and build upon the future of decentralized finance in the global forex market.
+
+---
+
+## 🚀 Development Setup
+
+### Prerequisites
+
+- Node.js (v16 or higher)
+- Yarn package manager
+- Sui CLI
+- Git
+
+### Project Structure
+
+```
+chainforex/
+├── move/               # Sui Move smart contracts
+│   ├── sources/       # Contract source files
+│   └── Move.toml      # Move package manifest
+├── frontend/          # React frontend application
+│   ├── src/          # Frontend source code
+│   └── package.json  # Frontend dependencies
+├── contracts/        # Additional contract utilities
+└── docs/            # Documentation
+```
+
+### Getting Started
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/yourusername/chainforex.git
+   cd chainforex
+   ```
+
+2. Install dependencies:
+   ```bash
+   yarn install
+   ```
+
+3. Build Move contracts:
+   ```bash
+   yarn move:build
+   ```
+
+4. Start frontend development server:
+   ```bash
+   yarn frontend:dev
+   ```
+
+### Available Scripts
+
+- `yarn frontend:dev` - Start frontend development server
+- `yarn frontend:build` - Build frontend for production
+- `yarn move:build` - Build Move contracts
+- `yarn move:test` - Run Move contract tests
+- `yarn move:publish` - Publish contracts to Sui network
+
+### Environment Setup
+
+Create a `.env` file in the frontend directory:
+```env
+VITE_SUI_NETWORK=devnet
+VITE_PYTH_ENDPOINT=https://xc-testnet.pyth.network
+```
+
 ## 🌟 Overview
 
 ChainForex is a decentralized, open-source forex trading bot that operates entirely on-chain. It leverages real-time price data from Pyth Network and executes trades automatically using smart contracts on the Sui blockchain.

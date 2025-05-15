@@ -1,0 +1,15 @@
+{
+  "name": "chainforex",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "frontend"
+  ],
+  "scripts": {
+    "frontend:dev": "yarn workspace chainforex-frontend dev",
+    "frontend:build": "yarn workspace chainforex-frontend build",
+    "move:build": "cd move && sui move build",
+    "move:test": "cd move && sui move test",
+    "move:publish": "cd move && sui client publish --gas-budget 200000000"
+  }
+}
