@@ -118,19 +118,19 @@ export default function Landing() {
         <p className="text-xl text-gray-400 mb-8 max-w-2xl mx-auto">
         Experience the future of forex trading with on-chain automation and real-time price feeds powered by Pyth.
         </p>
-        <div className="flex gap-4 justify-center">
+        <div className="flex gap-6 justify-center">
           <Link
-            to="/dashboard"
-            className="btn-primary inline-flex items-center"
+            to="/bots"
+            className="group relative inline-flex items-center px-8 py-3 bg-primary hover:bg-primary/90 text-white font-semibold rounded-lg transition-all duration-200 transform hover:scale-105 hover:shadow-lg active:scale-95"
           >
-            <CpuChipIcon className="h-5 w-5 mr-2" />
+            <CpuChipIcon className="h-5 w-5 mr-2 group-hover:animate-pulse" />
             Get Started
           </Link>
           <Link
             to="/documentation"
-            className="btn-secondary inline-flex items-center"
+            className="group relative inline-flex items-center px-8 py-3 bg-background-lighter hover:bg-background-light text-gray-300 hover:text-white font-semibold rounded-lg transition-all duration-200 transform hover:scale-105 hover:shadow-lg active:scale-95"
           >
-            <ChartBarIcon className="h-5 w-5 mr-2" />
+            <ChartBarIcon className="h-5 w-5 mr-2 group-hover:animate-pulse" />
             Documentation
           </Link>
         </div>
