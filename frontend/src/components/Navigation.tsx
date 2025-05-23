@@ -9,10 +9,10 @@ import {
 } from '@heroicons/react/24/outline'
 
 const navigation = [
-  { name: 'Trade Bots', to: '/', icon: RocketLaunchIcon },
+  { name: 'Trade Bots', to: '/bots', icon: RocketLaunchIcon },
   { name: 'Markets', to: '/markets', icon: ChartBarIcon },
-  { name: 'Trade', to: '/trading', icon: ArrowsRightLeftIcon },
-  { name: 'Learn', to: '/learn', icon: BookOpenIcon },
+  { name: 'Trade', to: '/trade', icon: ArrowsRightLeftIcon },
+  { name: 'Learn', to: '/documentation', icon: BookOpenIcon },
   { name: 'Settings', to: '/settings', icon: Cog6ToothIcon },
 ]
 

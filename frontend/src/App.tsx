@@ -4,6 +4,7 @@ import Layout from './components/Layout'
 import Landing from './pages/Landing'
 import Dashboard from './pages/Dashboard'
 import Trading from './pages/Trading'
+import Markets from './pages/Markets'
 import Documentation from './pages/Documentation'
 
 const router = createBrowserRouter([
@@ -31,7 +32,7 @@ const router = createBrowserRouter([
     children: [
       {
         index: true,
-        element: <Dashboard />,
+        element: <Markets />,
       },
     ],
   },
