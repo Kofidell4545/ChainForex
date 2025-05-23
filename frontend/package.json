@@ -1,7 +1,9 @@
 {
-  "name": "chainforex-frontend",
-  "private": true,
-  "version": "0.1.0",
+  "name": "chainforex",
+  "description": "A professional Forex trading platform with Pyth Network price feeds and automated trading capabilities",
+  "version": "1.0.0",
+  "author": "Samuel Elias",
+  "license": "MIT",
   "type": "module",
   "scripts": {
     "dev": "vite",

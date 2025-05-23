@@ -11,6 +11,20 @@ An open-source forex trading bot built on the Sui blockchain, powered by Pyth Ne
 
 **ChainForex** is a pioneering open-source protocol that automates forex trading on the blockchain. By combining real-time data from **Pyth** with the speed and security of **Sui**, ChainForex empowers developers and traders to experiment with, contribute to, and build upon the future of decentralized finance in the global forex market.
 
+### 📦 Package Information:
+
+- **Package Name**: chainforex
+- **Version**: 1.0.0
+- **Author**: Samuel Elias
+- **License**: MIT
+
+### 🔄 Latest Updates:
+
+- Added Markets page with real-time Pyth Network price feeds
+- Implemented professional forex trading interface
+- Added mock trading functionality for testing
+- Integrated automated trading bot capabilities
+
 ---
 
 ## 🚀 Development Setup

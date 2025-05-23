@@ -1,32 +1,50 @@
 module chainforex::position {
-    use sui::object::{Self, ID, UID};
-    use sui::transfer;
+    use sui::object::{Self, ID};
     use sui::event;
     use sui::tx_context::{Self, TxContext};
+    use chainforex::types::{Self, Position};
     use std::string::String;
-    
-    use chainforex::types::{Self, Position, PositionOpened, PositionClosed, PositionLiquidated};
-    use chainforex::price_feed::{Self, PriceFeed};
 
     friend chainforex::trading;
 
-    // Error codes
-    const E_UNAUTHORIZED: u64 = 0;
-    const E_POSITION_NOT_LIQUIDATABLE: u64 = 1;
-    const E_INVALID_PRICE: u64 = 2;
+    // Event structs
+    struct PositionOpened has copy, drop {
+        position_id: ID,
+        pair: String,
+        size: u64,
+        leverage: u64,
+        entry_price: u64,
+        is_long: bool,
+        owner: address,
+        timestamp: u64,
+    }
 
-    /// Opens a new position
+    struct PositionClosed has copy, drop {
+        position_id: ID,
+        pair: String,
+        exit_price: u64,
+        pnl: u64,
+        timestamp: u64,
+    }
+
+    struct PositionLiquidated has copy, drop {
+        position_id: ID,
+        pair: String,
+        liquidation_price: u64,
+        timestamp: u64,
+    }
+
+    /// Open a new position
     public(friend) fun open_position(
         pair: String,
         size: u64,
         leverage: u64,
         entry_price: u64,
         is_long: bool,
+        owner: address,
+        timestamp: u64,
         ctx: &mut TxContext
-    ): ID {
-        let owner = tx_context::sender(ctx);
-        let timestamp = tx_context::epoch_timestamp_ms(ctx);
-        
+    ): Position {
         let position = types::new_position(
             pair,
             size,
@@ -38,129 +56,97 @@ module chainforex::position {
             ctx
         );
 
-        let position_id = object::id(&position);
-
-        // Emit position opened event
         event::emit(PositionOpened {
-            position_id,
-            pair,
-            size,
-            leverage,
-            entry_price,
-            is_long,
-            owner,
-            timestamp,
+            position_id: object::uid_to_inner(types::get_position_id(&position)),
+            pair: types::get_position_pair(&position),
+            size: types::get_position_size(&position),
+            leverage: types::get_position_leverage(&position),
+            entry_price: types::get_position_entry_price(&position),
+            is_long: types::is_position_long(&position),
+            owner: types::get_position_owner(&position),
+            timestamp: types::get_position_timestamp(&position),
         });
 
-        // Transfer position to owner
-        transfer::transfer(position, owner);
-        
-        position_id
+        position
     }
 
-    /// Closes a position
-    public fun close_position(
+    /// Close a position
+    public(friend) fun close_position(
         position: Position,
         exit_price: u64,
         ctx: &mut TxContext
     ) {
-        let Position {
-            id,
-            pair,
+        let id = types::get_position_id(&position);
+        let pair = types::get_position_pair(&position);
+        let size = types::get_position_size(&position);
+        let leverage = types::get_position_leverage(&position);
+        let entry_price = types::get_position_entry_price(&position);
+        let is_long = types::is_position_long(&position);
+
+        let pnl = calculate_pnl(
             size,
             leverage,
             entry_price,
-            liquidation_price: _,
-            is_long,
-            owner,
-            timestamp: _
-        } = position;
+            exit_price,
+            is_long
+        );
 
-        assert!(tx_context::sender(ctx) == owner, E_UNAUTHORIZED);
-
-        // Calculate PnL
-        let pnl = calculate_pnl(size, leverage, entry_price, exit_price, is_long);
-
-        // Emit position closed event
         event::emit(PositionClosed {
-            position_id: object::uid_to_inner(&id),
+            position_id: object::uid_to_inner(id),
             pair,
             exit_price,
             pnl,
             timestamp: tx_context::epoch_timestamp_ms(ctx),
         });
 
-        object::delete(id);
+        types::destroy_position(position);
     }
 
-    /// Liquidates a position if price crosses liquidation threshold
-    public fun liquidate_position(
+    /// Liquidate a position
+    public(friend) fun liquidate_position(
         position: Position,
-        current_price: u64,
         ctx: &mut TxContext
     ) {
-        let Position {
-            id,
-            pair,
-            size: _,
-            leverage: _,
-            entry_price: _,
-            liquidation_price,
-            is_long,
-            owner: _,
-            timestamp: _
-        } = position;
+        let id = types::get_position_id(&position);
+        let pair = types::get_position_pair(&position);
+        let liquidation_price = types::get_position_liquidation_price(&position);
 
-        // Check if position can be liquidated
-        let can_liquidate = if (is_long) {
-            current_price <= liquidation_price
-        } else {
-            current_price >= liquidation_price
-        };
-
-        assert!(can_liquidate, E_POSITION_NOT_LIQUIDATABLE);
-
-        // Emit liquidation event
         event::emit(PositionLiquidated {
-            position_id: object::uid_to_inner(&id),
+            position_id: object::uid_to_inner(id),
             pair,
             liquidation_price,
             timestamp: tx_context::epoch_timestamp_ms(ctx),
         });
 
-        object::delete(id);
+        types::destroy_position(position);
     }
 
-    /// Calculate position PnL
+    /// Calculate PnL for a position
     fun calculate_pnl(
         size: u64,
         leverage: u64,
         entry_price: u64,
         exit_price: u64,
         is_long: bool
-    ): i64 {
+    ): u64 {
         let price_diff = if (is_long) {
-            (exit_price as i64) - (entry_price as i64)
+            (exit_price * 100) / entry_price - 100
         } else {
-            (entry_price as i64) - (exit_price as i64)
+            (entry_price * 100) / exit_price - 100
         };
 
-        let leveraged_size = (size as i64) * (leverage as i64);
-        (leveraged_size * price_diff) / (entry_price as i64)
+        (size * leverage * price_diff) / 100
     }
 
     /// Check if a position needs to be liquidated
-    public fun check_liquidation(
+    public fun needs_liquidation(
         position: &Position,
         current_price: u64
     ): bool {
-        let liquidation_price = types::get_position_liquidation_price(position);
-        let is_long = types::is_position_long(position);
-
-        if (is_long) {
-            current_price <= liquidation_price
+        if (types::is_position_long(position)) {
+            current_price <= types::get_position_liquidation_price(position)
         } else {
-            current_price >= liquidation_price
+            current_price >= types::get_position_liquidation_price(position)
         }
     }
 }

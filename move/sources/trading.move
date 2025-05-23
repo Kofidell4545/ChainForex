@@ -1,134 +1,125 @@
 module chainforex::trading {
-    use sui::object::{Self, ID};
-    use sui::clock::Clock;
     use sui::tx_context::{Self, TxContext};
-    use std::string;
-    
+    use std::string::String;
+
     use chainforex::types::{Self, Position, MarketState};
-    use chainforex::price_feed::{Self, PriceFeed};
     use chainforex::position;
+    use chainforex::price_feed::{Self, PriceFeed};
 
     // Error codes
-    const E_INVALID_PAIR: u64 = 0;
-    const E_MARKET_PAUSED: u64 = 1;
-    const E_PRICE_UNAVAILABLE: u64 = 2;
+    const E_INVALID_PRICE: u64 = 1;
 
-    /// Opens a new trading position
+    /// Initialize market and price feed
+    public entry fun initialize(
+        pair: String,
+        ctx: &mut TxContext
+    ) {
+        // Create market state
+        let market = types::new_market_state(
+            pair,
+            ctx
+        );
+
+        // Create price feed
+        let feed = price_feed::new_price_feed(
+            pair,
+            ctx
+        );
+
+        // Share objects
+        types::share_market(market);
+        price_feed::share_feed(feed);
+    }
+
+    /// Open a new position
     public entry fun open_position(
         market: &mut MarketState,
-        price_feed: &PriceFeed,
-        clock: &Clock,
-        pair: vector<u8>,
+        feed: &PriceFeed,
         size: u64,
         leverage: u64,
         is_long: bool,
         ctx: &mut TxContext
-    ): ID {
-        // Validate trading pair
-        let pair_str = string::utf8(pair);
-        assert!(market.pair == pair_str, E_INVALID_PAIR);
+    ) {
+        // Get current price
+        let entry_price = price_feed::get_latest_price(feed);
 
-        // Get current price from feed
-        let current_price = price_feed::get_latest_price(price_feed, clock);
-        assert!(current_price > 0, E_PRICE_UNAVAILABLE);
+        // Open position
+        let position = position::open_position(
+            types::get_market_pair(market),
+            size,
+            leverage,
+            entry_price,
+            is_long,
+            tx_context::sender(ctx),
+            tx_context::epoch_timestamp_ms(ctx),
+            ctx
+        );
 
         // Update market state
         if (is_long) {
-            market.total_long_positions = market.total_long_positions + size;
+            types::increment_long_positions(market);
         } else {
-            market.total_short_positions = market.total_short_positions + size;
+            types::increment_short_positions(market);
         };
-        market.total_volume_24h = market.total_volume_24h + size;
-        market.last_price = current_price;
-        market.last_update = tx_context::epoch_timestamp_ms(ctx);
+        types::add_volume(market, size);
 
-        // Open position
-        position::open_position(
-            pair_str,
-            size,
-            leverage,
-            current_price,
-            is_long,
-            ctx
-        )
+        // Transfer position to sender
+        types::transfer_position(position, tx_context::sender(ctx));
     }
 
-    /// Closes an existing position
+    /// Close a position
     public entry fun close_position(
         market: &mut MarketState,
-        price_feed: &PriceFeed,
-        clock: &Clock,
+        feed: &PriceFeed,
         position: Position,
         ctx: &mut TxContext
     ) {
-        // Get current price from feed
-        let current_price = price_feed::get_latest_price(price_feed, clock);
-        assert!(current_price > 0, E_PRICE_UNAVAILABLE);
-
-        // Update market state
-        let position_size = types::get_position_size(&position);
-        if (types::is_position_long(&position)) {
-            market.total_long_positions = market.total_long_positions - position_size;
-        } else {
-            market.total_short_positions = market.total_short_positions - position_size;
-        };
-        market.last_price = current_price;
-        market.last_update = tx_context::epoch_timestamp_ms(ctx);
+        let is_long = types::is_position_long(&position);
+        
+        // Get current price
+        let exit_price = price_feed::get_latest_price(feed);
 
         // Close position
-        position::close_position(position, current_price, ctx);
+        position::close_position(
+            position,
+            exit_price,
+            ctx
+        );
+
+        // Update market state
+        if (is_long) {
+            types::decrement_long_positions(market);
+        } else {
+            types::decrement_short_positions(market);
+        };
     }
 
-    /// Liquidates a position if necessary
+    /// Liquidate a position
     public entry fun liquidate_position(
         market: &mut MarketState,
-        price_feed: &PriceFeed,
-        clock: &Clock,
+        feed: &PriceFeed,
         position: Position,
         ctx: &mut TxContext
     ) {
-        // Get current price from feed
-        let current_price = price_feed::get_latest_price(price_feed, clock);
-        assert!(current_price > 0, E_PRICE_UNAVAILABLE);
+        let is_long = types::is_position_long(&position);
+        
+        // Get current price
+        let current_price = price_feed::get_latest_price(feed);
 
-        // Check if position needs liquidation
-        assert!(position::check_liquidation(&position, current_price), 0);
-
-        // Update market state
-        let position_size = types::get_position_size(&position);
-        if (types::is_position_long(&position)) {
-            market.total_long_positions = market.total_long_positions - position_size;
-        } else {
-            market.total_short_positions = market.total_short_positions - position_size;
-        };
-        market.last_price = current_price;
-        market.last_update = tx_context::epoch_timestamp_ms(ctx);
+        // Check if position can be liquidated
+        assert!(position::needs_liquidation(&position, current_price), E_INVALID_PRICE);
 
         // Liquidate position
-        position::liquidate_position(position, current_price, ctx);
-    }
-
-    /// Creates a new market for a trading pair
-    public entry fun create_market(
-        pair: vector<u8>,
-        ctx: &mut TxContext
-    ) {
-        let market = types::new_market_state(
-            string::utf8(pair),
+        position::liquidate_position(
+            position,
             ctx
         );
-        sui::transfer::share_object(market);
-    }
 
-    /// Creates a new price feed for a trading pair
-    public entry fun create_price_feed(
-        price_identifier: vector<u8>,
-        ctx: &mut TxContext
-    ) {
-        let feed = price_feed::new_price_feed(
-            price_identifier,
-            ctx
-        );
-        sui::transfer::share_object(feed);
+        // Update market state
+        if (is_long) {
+            types::decrement_long_positions(market);
+        } else {
+            types::decrement_short_positions(market);
+        };
     }
 }

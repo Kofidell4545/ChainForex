@@ -1,73 +1,110 @@
 module chainforex::types {
-    use sui::object::{Self, ID, UID};
+    use sui::object::{Self, UID};
     use sui::tx_context::TxContext;
     use std::string::String;
-    
+    use sui::transfer;
+
     friend chainforex::trading;
     friend chainforex::position;
-
-    // Constants for position management
-    const MAX_LEVERAGE: u64 = 10; // 10x max leverage
-    const MIN_POSITION_SIZE: u64 = 100; // Minimum position size in USD
-    const MAX_POSITION_SIZE: u64 = 1000000; // Maximum position size in USD
-
-    // Error codes
-    const E_INVALID_LEVERAGE: u64 = 0;
-    const E_INVALID_POSITION_SIZE: u64 = 1;
-    const E_INSUFFICIENT_MARGIN: u64 = 2;
 
     /// Represents a trading position
     struct Position has key, store {
         id: UID,
-        pair: String,           // Trading pair (e.g., "EUR/USD")
-        size: u64,             // Position size in USD
-        leverage: u64,         // Current leverage (1-10x)
-        entry_price: u64,      // Entry price in base currency
-        liquidation_price: u64, // Price at which position gets liquidated
-        is_long: bool,         // true for long, false for short
-        owner: address,        // Position owner's address
-        timestamp: u64,        // Position opening timestamp
-    }
-
-    /// Represents market state for a trading pair
-    struct MarketState has key {
-        id: UID,
-        pair: String,
-        last_price: u64,
-        last_update: u64,
-        total_long_positions: u64,
-        total_short_positions: u64,
-        total_volume_24h: u64,
-    }
-
-    // Events
-    struct PositionOpened has copy, drop {
-        position_id: ID,
         pair: String,
         size: u64,
         leverage: u64,
         entry_price: u64,
+        liquidation_price: u64,
         is_long: bool,
         owner: address,
         timestamp: u64,
     }
 
-    struct PositionClosed has copy, drop {
-        position_id: ID,
+    /// Represents the state of a trading market
+    struct MarketState has key {
+        id: UID,
         pair: String,
-        exit_price: u64,
-        pnl: i64,
-        timestamp: u64,
+        total_long_positions: u64,
+        total_short_positions: u64,
+        total_volume_24h: u64,
     }
 
-    struct PositionLiquidated has copy, drop {
-        position_id: ID,
-        pair: String,
-        liquidation_price: u64,
-        timestamp: u64,
+    // Position accessors
+    public fun get_position_id(position: &Position): &UID {
+        &position.id
     }
 
-    // Constructor for Position
+    public fun get_position_pair(position: &Position): String {
+        position.pair
+    }
+
+    public fun get_position_size(position: &Position): u64 {
+        position.size
+    }
+
+    public fun get_position_leverage(position: &Position): u64 {
+        position.leverage
+    }
+
+    public fun get_position_entry_price(position: &Position): u64 {
+        position.entry_price
+    }
+
+    public fun get_position_liquidation_price(position: &Position): u64 {
+        position.liquidation_price
+    }
+
+    public fun is_position_long(position: &Position): bool {
+        position.is_long
+    }
+
+    public fun get_position_owner(position: &Position): address {
+        position.owner
+    }
+
+    public fun get_position_timestamp(position: &Position): u64 {
+        position.timestamp
+    }
+
+    // Market state accessors
+    public fun get_market_pair(market: &MarketState): String {
+        market.pair
+    }
+
+    public fun get_long_positions(market: &MarketState): u64 {
+        market.total_long_positions
+    }
+
+    public fun get_short_positions(market: &MarketState): u64 {
+        market.total_short_positions
+    }
+
+    public fun get_total_volume(market: &MarketState): u64 {
+        market.total_volume_24h
+    }
+
+    // Market state mutators
+    public(friend) fun increment_long_positions(market: &mut MarketState) {
+        market.total_long_positions = market.total_long_positions + 1;
+    }
+
+    public(friend) fun decrement_long_positions(market: &mut MarketState) {
+        market.total_long_positions = market.total_long_positions - 1;
+    }
+
+    public(friend) fun increment_short_positions(market: &mut MarketState) {
+        market.total_short_positions = market.total_short_positions + 1;
+    }
+
+    public(friend) fun decrement_short_positions(market: &mut MarketState) {
+        market.total_short_positions = market.total_short_positions - 1;
+    }
+
+    public(friend) fun add_volume(market: &mut MarketState, volume: u64) {
+        market.total_volume_24h = market.total_volume_24h + volume;
+    }
+
+    // Constructor functions
     public(friend) fun new_position(
         pair: String,
         size: u64,
@@ -78,13 +115,10 @@ module chainforex::types {
         timestamp: u64,
         ctx: &mut TxContext
     ): Position {
-        assert!(leverage <= MAX_LEVERAGE, E_INVALID_LEVERAGE);
-        assert!(size >= MIN_POSITION_SIZE && size <= MAX_POSITION_SIZE, E_INVALID_POSITION_SIZE);
-        
         let liquidation_price = if (is_long) {
-            entry_price - ((entry_price * 90) / (leverage * 100))
+            entry_price - (entry_price / (leverage * 2))
         } else {
-            entry_price + ((entry_price * 90) / (leverage * 100))
+            entry_price + (entry_price / (leverage * 2))
         };
 
         Position {
@@ -100,7 +134,6 @@ module chainforex::types {
         }
     }
 
-    // Constructor for MarketState
     public(friend) fun new_market_state(
         pair: String,
         ctx: &mut TxContext
@@ -108,19 +141,25 @@ module chainforex::types {
         MarketState {
             id: object::new(ctx),
             pair,
-            last_price: 0,
-            last_update: 0,
             total_long_positions: 0,
             total_short_positions: 0,
             total_volume_24h: 0,
         }
     }
 
-    // Accessors
-    public fun get_position_size(position: &Position): u64 { position.size }
-    public fun get_position_leverage(position: &Position): u64 { position.leverage }
-    public fun get_position_entry_price(position: &Position): u64 { position.entry_price }
-    public fun get_position_liquidation_price(position: &Position): u64 { position.liquidation_price }
-    public fun is_position_long(position: &Position): bool { position.is_long }
-    public fun get_position_owner(position: &Position): address { position.owner }
+    // Cleanup functions
+    public(friend) fun destroy_position(position: Position) {
+        let Position { id, pair: _, size: _, leverage: _, entry_price: _, liquidation_price: _, is_long: _, owner: _, timestamp: _ } = position;
+        object::delete(id);
+    }
+
+    // Share market state
+    public(friend) fun share_market(market: MarketState) {
+        transfer::share_object(market);
+    }
+
+    // Transfer position
+    public(friend) fun transfer_position(position: Position, recipient: address) {
+        transfer::transfer(position, recipient);
+    }
 }
